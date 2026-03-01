@@ -1,3 +1,4 @@
+use pathsearch::find_executable_in_path;
 #[allow(unused_imports)]
 use std::io::{self, Write};
 
@@ -16,7 +17,13 @@ fn main() {
         } else if command.starts_with("type ") {
             match &command[5..] {
                 "exit" | "echo" | "type" => println!("{} is a shell builtin", &command[5..]),
-                _ => println!("{}: not found", &command[5..]),
+                _ => {
+                    if let Some(path) = find_executable_in_path(&command[5..]) {
+                        println!("{} is {}", command, path.display());
+                    } else {
+                        println!("{}: not found", &command[5..]);
+                    }
+                }
             }
         } else {
             println!("{}: command not found", command);
