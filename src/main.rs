@@ -19,7 +19,7 @@ fn main() {
                 "exit" | "echo" | "type" => println!("{} is a shell builtin", &command[5..]),
                 _ => {
                     if let Some(path) = find_executable_in_path(&command[5..]) {
-                        println!("{} is {}", command, path.display());
+                        println!("{} is {}", &command[5..], path.display());
                     } else {
                         println!("{}: not found", &command[5..]);
                     }
