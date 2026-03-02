@@ -12,6 +12,10 @@ fn main() {
         io::stdin().read_line(&mut input).unwrap();
         input = input.trim().to_string();
 
+        if input.is_empty() {
+            continue;
+        }
+
         if input == "exit" {
             break;
         }
@@ -91,6 +95,12 @@ fn parse_args(input: &str) -> Vec<String> {
                     } else {
                         current.push(c);
                     }
+                }
+            }
+
+            '\\' => {
+                if let Some(next) = chars.next() {
+                    current.push(next);
                 }
             }
 
