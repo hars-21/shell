@@ -21,10 +21,10 @@ fn main() {
 }
 
 fn run_commands(input: &str) {
-    let args: Vec<&str> = input.split_whitespace().collect();
-    let command = args[0];
+    let args = parse_args(input);
+    let command = &args[0];
 
-    match command {
+    match command.as_str() {
         "cd" => {
             if args[1] == "~" {
                 env::set_current_dir(env::var("HOME").unwrap())
@@ -36,7 +36,7 @@ fn run_commands(input: &str) {
         }
         "pwd" => println!("{}", env::current_dir().unwrap().display()),
         "echo" => println!("{}", args[1..].join(" ")),
-        "type" => match args[1] {
+        "type" => match args[1].as_str() {
             "exit" | "echo" | "type" | "pwd" | "cd" => println!("{} is a shell builtin", args[1]),
             _ => {
                 if let Some(path) = find_executable_in_path(&args[1]) {
@@ -50,8 +50,64 @@ fn run_commands(input: &str) {
             if let Some(_path) = find_executable_in_path(&command) {
                 let _status = Command::new(command).args(&args[1..]).status();
             } else {
-                println!("{}: command not found", command);
+                println!("{}: command not found", &command);
             }
         }
     }
+}
+
+fn parse_args(input: &str) -> Vec<String> {
+    let mut args = Vec::new();
+    let mut current = String::new();
+    let mut chars = input.chars().peekable();
+
+    while let Some(c) = chars.next() {
+        match c {
+            '\'' => {
+                while let Some(c) = chars.next() {
+                    if c == '\'' {
+                        break;
+                    } else {
+                        current.push(c);
+                    }
+                }
+            }
+
+            '"' => {
+                while let Some(c) = chars.next() {
+                    if c == '"' {
+                        break;
+                    }
+                    if c == '\\' {
+                        if let Some(next) = chars.next() {
+                            match next {
+                                '"' | '\\' | '$' | '\n' => current.push(next),
+                                _ => {
+                                    current.push('\\');
+                                    current.push(next);
+                                }
+                            }
+                        }
+                    } else {
+                        current.push(c);
+                    }
+                }
+            }
+
+            ' ' | '\t' => {
+                if !current.is_empty() {
+                    args.push(current.clone());
+                    current.clear();
+                }
+            }
+
+            _ => current.push(c),
+        }
+    }
+
+    if !current.is_empty() {
+        args.push(current);
+    }
+
+    args
 }
