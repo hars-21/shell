@@ -25,8 +25,15 @@ fn run_commands(input: &str) {
     let command = args[0];
 
     match command {
-        "cd" => env::set_current_dir(&args[1])
-            .unwrap_or_else(|_| println!("cd: {}: No such file or directory", &args[1])),
+        "cd" => {
+            if args[1] == "~" {
+                env::set_current_dir(env::var("HOME").unwrap())
+                    .unwrap_or_else(|_| println!("cd: {}: No such file or directory", &args[1]))
+            } else {
+                env::set_current_dir(&args[1])
+                    .unwrap_or_else(|_| println!("cd: {}: No such file or directory", &args[1]))
+            }
+        }
         "pwd" => println!("{}", env::current_dir().unwrap().display()),
         "echo" => println!("{}", args[1..].join(" ")),
         "type" => match args[1] {
