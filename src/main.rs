@@ -28,7 +28,7 @@ fn run_commands(input: &str) {
         "pwd" => println!("{}", env::current_dir().unwrap().display()),
         "echo" => println!("{}", parts[1..].join(" ")),
         "type" => match parts[1] {
-            "exit" | "echo" | "type" => println!("{} is a shell builtin", parts[1]),
+            "exit" | "echo" | "type" | "pwd" => println!("{} is a shell builtin", parts[1]),
             _ => {
                 if let Some(path) = find_executable_in_path(&parts[1]) {
                     println!("{} is {}", parts[1], path.display());
