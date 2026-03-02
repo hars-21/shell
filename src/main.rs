@@ -1,32 +1,46 @@
 use pathsearch::find_executable_in_path;
 #[allow(unused_imports)]
 use std::io::{self, Write};
+use std::process::Command;
 
 fn main() {
     loop {
         print!("$ ");
         io::stdout().flush().unwrap();
-        let mut command = String::new();
-        io::stdin().read_line(&mut command).unwrap();
-        command = command.trim().to_string();
+        let mut input = String::new();
+        io::stdin().read_line(&mut input).unwrap();
+        input = input.trim().to_string();
 
-        if command == "exit" {
+        if input == "exit" {
             break;
-        } else if command.starts_with("echo ") {
-            println!("{}", &command[5..]);
-        } else if command.starts_with("type ") {
-            match &command[5..] {
-                "exit" | "echo" | "type" => println!("{} is a shell builtin", &command[5..]),
-                _ => {
-                    if let Some(path) = find_executable_in_path(&command[5..]) {
-                        println!("{} is {}", &command[5..], path.display());
-                    } else {
-                        println!("{}: not found", &command[5..]);
-                    }
+        }
+
+        run_commands(&input);
+    }
+}
+
+fn run_commands(input: &str) {
+    let parts: Vec<&str> = input.split_whitespace().collect();
+    let command = parts[0];
+
+    match command {
+        "echo" => println!("{}", parts[1..].join(" ")),
+        "type" => match parts[1] {
+            "exit" | "echo" | "type" => println!("{} is a shell builtin", parts[1]),
+            _ => {
+                if let Some(path) = find_executable_in_path(&parts[1]) {
+                    println!("{} is {}", parts[1], path.display());
+                } else {
+                    println!("{}: not found", parts[1]);
                 }
             }
-        } else {
-            println!("{}: command not found", command);
+        },
+        _ => {
+            if let Some(_path) = find_executable_in_path(&command) {
+                let _status = Command::new(command).args(&parts[1..]).status();
+            } else {
+                println!("{}: command not found", command);
+            }
         }
     }
 }
