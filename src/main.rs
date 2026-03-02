@@ -1,4 +1,5 @@
 use pathsearch::find_executable_in_path;
+use std::env;
 #[allow(unused_imports)]
 use std::io::{self, Write};
 use std::process::Command;
@@ -24,6 +25,7 @@ fn run_commands(input: &str) {
     let command = parts[0];
 
     match command {
+        "pwd" => println!("{}", env::current_dir().unwrap().display()),
         "echo" => println!("{}", parts[1..].join(" ")),
         "type" => match parts[1] {
             "exit" | "echo" | "type" => println!("{} is a shell builtin", parts[1]),
