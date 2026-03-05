@@ -1,8 +1,16 @@
 use pathsearch::find_executable_in_path;
 use std::env;
+use std::fs::{File, write};
 #[allow(unused_imports)]
 use std::io::{self, Write};
 use std::process::Command;
+
+struct CommandLine {
+    command: String,
+    args: Vec<String>,
+    redirect: bool,
+    filename: Option<String>,
+}
 
 fn main() {
     loop {
@@ -25,8 +33,9 @@ fn main() {
 }
 
 fn run_commands(input: &str) {
-    let args = parse_args(input);
-    let command = &args[0];
+    let shell_command = parse_args(input);
+    let command = &shell_command.command;
+    let args = &shell_command.args;
 
     match command.as_str() {
         "cd" => {
@@ -39,7 +48,12 @@ fn run_commands(input: &str) {
             }
         }
         "pwd" => println!("{}", env::current_dir().unwrap().display()),
-        "echo" => println!("{}", args[1..].join(" ")),
+        "echo" => {
+            println!("{}", args[1..].join(" "));
+            if shell_command.redirect {
+                file_write(&shell_command.filename, &args[1..].join(" "))
+            }
+        }
         "type" => match args[1].as_str() {
             "exit" | "echo" | "type" | "pwd" | "cd" => println!("{} is a shell builtin", args[1]),
             _ => {
@@ -60,10 +74,12 @@ fn run_commands(input: &str) {
     }
 }
 
-fn parse_args(input: &str) -> Vec<String> {
+fn parse_args(input: &str) -> CommandLine {
     let mut args = Vec::new();
     let mut current = String::new();
     let mut chars = input.chars().peekable();
+    let mut redirect = false;
+    let mut filename: Option<String> = None;
 
     while let Some(c) = chars.next() {
         match c {
@@ -106,9 +122,18 @@ fn parse_args(input: &str) -> Vec<String> {
 
             ' ' | '\t' => {
                 if !current.is_empty() {
-                    args.push(current.clone());
+                    if redirect {
+                        filename = Some(current.clone());
+                        redirect = false;
+                    } else {
+                        args.push(current.clone());
+                    }
                     current.clear();
                 }
+            }
+
+            '>' => {
+                redirect = true;
             }
 
             _ => current.push(c),
@@ -116,8 +141,31 @@ fn parse_args(input: &str) -> Vec<String> {
     }
 
     if !current.is_empty() {
-        args.push(current);
+        if redirect {
+            filename = Some(current.clone());
+        } else {
+            args.push(current.clone());
+        }
+        current.clear();
     }
 
-    args
+    redirect = filename.is_some();
+
+    let shell_command = CommandLine {
+        command: args[0].clone(),
+        args: args,
+        redirect,
+        filename,
+    };
+
+    return shell_command;
+}
+
+fn file_write(filename: &Option<String>, content: &String) {
+    if let Some(file) = filename {
+        File::create(&file).unwrap();
+        write(&file, content).unwrap();
+    } else {
+        println!("{content}");
+    }
 }
