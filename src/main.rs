@@ -66,7 +66,13 @@ fn run_commands(input: &str) {
         },
         _ => {
             if let Some(_path) = find_executable_in_path(&command) {
-                let _status = Command::new(command).args(&args[1..]).status();
+                let status = Command::new(command).args(&args[1..]).output();
+                if let Ok(s) = status {
+                    let content = String::from_utf8(s.stdout);
+                    if let Ok(c) = content {
+                        file_write(&shell_command.filename, &c);
+                    }
+                }
             } else {
                 println!("{}: command not found", &command);
             }
@@ -165,7 +171,5 @@ fn file_write(filename: &Option<String>, content: &String) {
     if let Some(file) = filename {
         File::create(&file).unwrap();
         write(&file, content).unwrap();
-    } else {
-        println!("{content}");
     }
 }
