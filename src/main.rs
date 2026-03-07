@@ -66,11 +66,15 @@ fn run_commands(input: &str) {
         },
         _ => {
             if let Some(_path) = find_executable_in_path(&command) {
-                let status = Command::new(command).args(&args[1..]).output();
-                if let Ok(s) = status {
-                    let content = String::from_utf8(s.stdout);
+                let output = Command::new(command).args(&args[1..]).output();
+                if let Ok(out) = output {
+                    let content = String::from_utf8(out.stdout);
                     if let Ok(c) = content {
-                        file_write(&shell_command.filename, &c);
+                        if shell_command.redirect {
+                            file_write(&shell_command.filename, &c);
+                        }
+                    } else {
+                        println!("{:?}", content);
                     }
                 }
             } else {
