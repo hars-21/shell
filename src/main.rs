@@ -144,6 +144,15 @@ fn parse_args(input: &str) -> CommandLine {
                 }
             }
 
+            '1' => {
+                if let Some('>') = chars.peek() {
+                    chars.next();
+                    redirect = true;
+                } else {
+                    current.push('1');
+                }
+            }
+
             '>' => {
                 redirect = true;
             }
