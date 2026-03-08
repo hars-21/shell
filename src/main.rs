@@ -1,6 +1,6 @@
 use pathsearch::find_executable_in_path;
 use std::env;
-use std::fs::{File, write};
+use std::fs::File;
 #[allow(unused_imports)]
 use std::io::{self, Write};
 use std::process::Command;
@@ -72,6 +72,8 @@ fn run_commands(input: &str) {
                     if let Ok(c) = content {
                         if shell_command.redirect {
                             file_write(&shell_command.filename, &c);
+                        } else {
+                            print!("{}", c);
                         }
                     } else {
                         println!("{:?}", content);
@@ -173,7 +175,7 @@ fn parse_args(input: &str) -> CommandLine {
 
 fn file_write(filename: &Option<String>, content: &String) {
     if let Some(file) = filename {
-        File::create(&file).unwrap();
-        write(&file, content).unwrap();
+        let mut f = File::create(file).unwrap();
+        f.write_all(content.as_bytes()).unwrap();
     }
 }
