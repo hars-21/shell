@@ -49,9 +49,10 @@ fn run_commands(input: &str) {
         }
         "pwd" => println!("{}", env::current_dir().unwrap().display()),
         "echo" => {
-            println!("{}", args[1..].join(" "));
             if shell_command.redirect {
-                file_write(&shell_command.filename, &args[1..].join(" "))
+                file_write(&shell_command.filename, &args[1..].join(" "));
+            } else {
+                println!("{}", args[1..].join(" "));
             }
         }
         "type" => match args[1].as_str() {
