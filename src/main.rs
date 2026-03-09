@@ -74,10 +74,10 @@ fn run_commands(input: &str) {
                         if shell_command.redirect {
                             file_write(&shell_command.filename, &c);
                         } else {
-                            print!("{}", c);
+                            print!("{}\n", c);
                         }
                     } else {
-                        println!("{:?}", content);
+                        println!("{}", content.unwrap());
                     }
                 }
             } else {
