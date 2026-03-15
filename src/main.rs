@@ -1,191 +1,153 @@
-use pathsearch::find_executable_in_path;
-use std::env;
-use std::fs::File;
-#[allow(unused_imports)]
 use std::io::{self, Write};
-use std::process::Command;
+use std::process;
 
-struct CommandLine {
-    command: String,
+use codecrafters_shell::{cd, command_type, echo, exec, file_write, pwd};
+
+struct ShellCommand {
+    name: String,
     args: Vec<String>,
-    redirect: bool,
-    filename: Option<String>,
+    append: bool,
+    filename: String,
+}
+
+impl ShellCommand {
+    fn build(command_line: &str) -> Result<ShellCommand, &str> {
+        let mut tokens = Vec::new();
+        let mut current = String::new();
+        let mut chars = command_line.chars().peekable();
+        let mut append = false;
+        let mut filename = String::new();
+
+        while let Some(c) = chars.next() {
+            match c {
+                '\'' => {
+                    while let Some(c) = chars.next() {
+                        if c == '\'' {
+                            break;
+                        } else {
+                            current.push(c);
+                        }
+                    }
+                }
+
+                '"' => {
+                    while let Some(c) = chars.next() {
+                        if c == '"' {
+                            break;
+                        }
+                        if c == '\\' {
+                            if let Some(next) = chars.next() {
+                                match next {
+                                    '"' | '\\' | '$' | '\n' => current.push(next),
+                                    _ => {
+                                        current.push('\\');
+                                        current.push(next);
+                                    }
+                                }
+                            }
+                        } else {
+                            current.push(c);
+                        }
+                    }
+                }
+
+                '\\' => {
+                    if let Some(next) = chars.next() {
+                        current.push(next);
+                    }
+                }
+
+                ' ' | '\t' => {
+                    if !current.is_empty() {
+                        if append {
+                            filename = current.clone();
+                            append = false;
+                        } else {
+                            tokens.push(current.clone());
+                        }
+                        current.clear();
+                    }
+                }
+
+                '1' => {
+                    if let Some('>') = chars.peek() {
+                        chars.next();
+                        append = true;
+                    } else {
+                        current.push('1');
+                    }
+                }
+
+                '>' => {
+                    append = true;
+                }
+
+                _ => current.push(c),
+            }
+        }
+
+        if !current.is_empty() {
+            if append {
+                filename = current.clone();
+            } else {
+                tokens.push(current.clone());
+            }
+            current.clear();
+        }
+
+        append = !filename.is_empty();
+        let (name, args) = tokens.split_first().unwrap();
+
+        Ok(ShellCommand {
+            name: name.clone(),
+            args: args.to_vec(),
+            append,
+            filename,
+        })
+    }
+
+    fn run(&self) -> Result<String, String> {
+        let command = &self.name;
+        let args = &self.args;
+
+        match command.as_str() {
+            "cd" => cd(args),
+            "pwd" => pwd(),
+            "echo" => echo(&args),
+            "type" => command_type(&command),
+            _ => exec(&command, &args),
+        }
+    }
 }
 
 fn main() {
     loop {
         print!("$ ");
         io::stdout().flush().unwrap();
-        let mut input = String::new();
-        io::stdin().read_line(&mut input).unwrap();
-        input = input.trim().to_string();
+        let mut command_line = String::new();
+        io::stdin().read_line(&mut command_line).unwrap();
+        command_line = command_line.trim().to_string();
 
-        if input.is_empty() {
+        if command_line.is_empty() {
             continue;
         }
 
-        if input == "exit" {
+        if command_line == "exit" {
             break;
         }
 
-        run_commands(&input);
-    }
-}
+        let cmd = ShellCommand::build(&command_line).unwrap_or_else(|err| {
+            eprintln!("Error parsing arguments: {err}");
+            process::exit(1);
+        });
 
-fn run_commands(input: &str) {
-    let shell_command = parse_args(input);
-    let command = &shell_command.command;
-    let args = &shell_command.args;
+        let output = cmd.run().unwrap_or_else(|err| {
+            eprintln!("{}", err);
+            process::exit(1);
+        });
 
-    match command.as_str() {
-        "cd" => {
-            if args[1] == "~" {
-                env::set_current_dir(env::var("HOME").unwrap())
-                    .unwrap_or_else(|_| println!("cd: {}: No such file or directory", &args[1]))
-            } else {
-                env::set_current_dir(&args[1])
-                    .unwrap_or_else(|_| println!("cd: {}: No such file or directory", &args[1]))
-            }
+        if cmd.append {
+            file_write(&cmd.filename, &output);
         }
-        "pwd" => println!("{}", env::current_dir().unwrap().display()),
-        "echo" => {
-            if shell_command.redirect {
-                file_write(&shell_command.filename, &args[1..].join(" "));
-            } else {
-                println!("{}", args[1..].join(" "));
-            }
-        }
-        "type" => match args[1].as_str() {
-            "exit" | "echo" | "type" | "pwd" | "cd" => println!("{} is a shell builtin", args[1]),
-            _ => {
-                if let Some(path) = find_executable_in_path(&args[1]) {
-                    println!("{} is {}", args[1], path.display());
-                } else {
-                    println!("{}: not found", args[1]);
-                }
-            }
-        },
-        _ => {
-            if let Some(_path) = find_executable_in_path(&command) {
-                let output = Command::new(command).args(&args[1..]).output();
-                if let Ok(out) = output {
-                    let content = String::from_utf8(out.stdout);
-                    if let Ok(c) = content {
-                        if shell_command.redirect {
-                            file_write(&shell_command.filename, &c);
-                        } else {
-                            print!("{}\n", c);
-                        }
-                    } else {
-                        println!("{}", content.unwrap());
-                    }
-                }
-            } else {
-                println!("{}: command not found", &command);
-            }
-        }
-    }
-}
-
-fn parse_args(input: &str) -> CommandLine {
-    let mut args = Vec::new();
-    let mut current = String::new();
-    let mut chars = input.chars().peekable();
-    let mut redirect = false;
-    let mut filename: Option<String> = None;
-
-    while let Some(c) = chars.next() {
-        match c {
-            '\'' => {
-                while let Some(c) = chars.next() {
-                    if c == '\'' {
-                        break;
-                    } else {
-                        current.push(c);
-                    }
-                }
-            }
-
-            '"' => {
-                while let Some(c) = chars.next() {
-                    if c == '"' {
-                        break;
-                    }
-                    if c == '\\' {
-                        if let Some(next) = chars.next() {
-                            match next {
-                                '"' | '\\' | '$' | '\n' => current.push(next),
-                                _ => {
-                                    current.push('\\');
-                                    current.push(next);
-                                }
-                            }
-                        }
-                    } else {
-                        current.push(c);
-                    }
-                }
-            }
-
-            '\\' => {
-                if let Some(next) = chars.next() {
-                    current.push(next);
-                }
-            }
-
-            ' ' | '\t' => {
-                if !current.is_empty() {
-                    if redirect {
-                        filename = Some(current.clone());
-                        redirect = false;
-                    } else {
-                        args.push(current.clone());
-                    }
-                    current.clear();
-                }
-            }
-
-            '1' => {
-                if let Some('>') = chars.peek() {
-                    chars.next();
-                    redirect = true;
-                } else {
-                    current.push('1');
-                }
-            }
-
-            '>' => {
-                redirect = true;
-            }
-
-            _ => current.push(c),
-        }
-    }
-
-    if !current.is_empty() {
-        if redirect {
-            filename = Some(current.clone());
-        } else {
-            args.push(current.clone());
-        }
-        current.clear();
-    }
-
-    redirect = filename.is_some();
-
-    let shell_command = CommandLine {
-        command: args[0].clone(),
-        args: args,
-        redirect,
-        filename,
-    };
-
-    return shell_command;
-}
-
-fn file_write(filename: &Option<String>, content: &String) {
-    if let Some(file) = filename {
-        let mut f = File::create(file).unwrap();
-        f.write_all(content.as_bytes()).unwrap();
     }
 }
