@@ -3,6 +3,25 @@ use std::process;
 
 use codecrafters_shell::{cd, command_type, echo, exec, file_write, pwd};
 
+// enum Builtin {
+//     Cd,
+//     Echo,
+//     Pwd,
+//     Type,
+// }
+
+// impl Builtin {
+//     fn from_str(s: &str) -> Option<Builtin> {
+//         match s {
+//             "cd" => Some(Builtin::Cd),
+//             "echo" => Some(Builtin::Echo),
+//             "pwd" => Some(Builtin::Pwd),
+//             "type" => Some(Builtin::Type),
+//             _ => None,
+//         }
+//     }
+// }
+
 struct ShellCommand {
     name: String,
     args: Vec<String>,
@@ -105,18 +124,41 @@ impl ShellCommand {
             filename,
         })
     }
+}
 
-    fn run(&self) -> Result<String, String> {
-        let command = &self.name;
-        let args = &self.args;
+fn run(cmd: ShellCommand) {
+    let command = &cmd.name;
+    let args = &cmd.args;
 
-        match command.as_str() {
-            "cd" => cd(args),
-            "pwd" => pwd(),
-            "echo" => echo(&args),
-            "type" => command_type(&command),
-            _ => exec(&command, &args),
+    match command.as_str() {
+        "cd" => cd(args).unwrap_or_else(|err| {
+            println!("{}", err);
+        }),
+        "pwd" => match pwd() {
+            Ok(c) => println!("{}", c),
+            Err(e) => println!("{}", e),
+        },
+        "echo" => {
+            if cmd.append {
+                file_write(&cmd.filename, &echo(&args));
+            } else {
+                println!("{}", &echo(&args));
+            }
         }
+        "type" => match command_type(&args) {
+            Ok(c) => println!("{}", c),
+            Err(e) => println!("{}", e),
+        },
+        _ => match &exec(&command, &args) {
+            Ok(c) => {
+                if cmd.append {
+                    file_write(&cmd.filename, c);
+                } else {
+                    println!("{}", c);
+                }
+            }
+            Err(e) => println!("{}", e),
+        },
     }
 }
 
@@ -141,13 +183,6 @@ fn main() {
             process::exit(1);
         });
 
-        let output = cmd.run().unwrap_or_else(|err| {
-            eprintln!("{}", err);
-            process::exit(1);
-        });
-
-        if cmd.append {
-            file_write(&cmd.filename, &output);
-        }
+        run(cmd);
     }
 }

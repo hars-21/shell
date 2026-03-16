@@ -17,16 +17,16 @@ pub fn pwd() -> Result<String, String> {
         .map_err(|e| format!("{}", e))
 }
 
-pub fn echo(args: &Vec<String>) -> Result<String, String> {
+pub fn echo(args: &Vec<String>) -> String {
     args.join(" ")
 }
 
-pub fn command_type(command: &String) -> Result<String, String> {
-    match command.as_str() {
-        "exit" | "echo" | "type" | "pwd" | "cd" => Ok(format!("{} is a shell builtin", command)),
-        _ => match find_executable_in_path(command) {
-            Some(path) => Ok(format!("{} is {}", command, path.display())),
-            None => Err(format!("{}: not found", command)),
+pub fn command_type(args: &Vec<String>) -> Result<String, String> {
+    match args[0].as_str() {
+        "exit" | "echo" | "type" | "pwd" | "cd" => Ok(format!("{} is a shell builtin", args[0])),
+        _ => match find_executable_in_path(&args[0]) {
+            Some(path) => Ok(format!("{} is {}", args[0], path.display())),
+            None => Err(format!("{}: not found", args[0])),
         },
     }
 }
@@ -75,9 +75,11 @@ mod tests {
     #[test]
     fn test_command_type() {
         let command = String::from("echo");
+        let args = vec![command];
+
         assert_eq!(
             String::from("echo is a shell builtin"),
-            command_type(&command).unwrap()
+            command_type(&args).unwrap()
         );
     }
 
