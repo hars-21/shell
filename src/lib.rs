@@ -1,5 +1,5 @@
 use pathsearch::find_executable_in_path;
-use std::{env, fs, process::Command};
+use std::{env, process::Command};
 
 pub fn cd(args: &Vec<String>) -> Result<(), String> {
     let target = if args[0] == "~" {
@@ -47,12 +47,6 @@ pub fn exec(command: &String, args: &Vec<String>) -> Result<(String, String), St
     Ok((stdout, stderr))
 }
 
-pub fn file_write(filename: &String, content: &String) {
-    if !filename.is_empty() {
-        fs::write(filename, content).unwrap();
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -91,15 +85,5 @@ mod tests {
         let command = String::from("args");
         let args = vec!["".to_string()];
         assert!(exec(&command, &args).is_err());
-    }
-
-    #[test]
-    fn test_file_write() {
-        let filename = String::from("test.txt");
-        let content = String::from("Testing file write");
-        file_write(&filename, &content);
-        let result = fs::read_to_string(filename).unwrap();
-
-        assert_eq!(content, result);
     }
 }

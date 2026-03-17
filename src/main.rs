@@ -1,7 +1,8 @@
+use std::fs::File;
 use std::io::{self, Write};
 use std::process;
 
-use codecrafters_shell::{cd, command_type, echo, exec, file_write, pwd};
+use codecrafters_shell::{cd, command_type, echo, exec, pwd};
 
 // enum Builtin {
 //     Cd,
@@ -146,47 +147,48 @@ impl ShellCommand {
 }
 
 fn run(cmd: ShellCommand) {
+    let mut stdout: Box<dyn Write> = match cmd.stdout {
+        Some(file) => Box::new(File::create(file).unwrap()),
+        None => Box::new(io::stdout()),
+    };
+
+    let mut stderr: Box<dyn Write> = match cmd.stderr {
+        Some(file) => Box::new(File::create(file).unwrap()),
+        None => Box::new(io::stderr()),
+    };
+
     let command = &cmd.name;
     let args = &cmd.args;
 
     match command.as_str() {
         "cd" => cd(args).unwrap_or_else(|err| {
-            println!("{}", err);
+            writeln!(stderr, "{}", err).unwrap();
         }),
+
         "pwd" => match pwd() {
-            Ok(c) => println!("{}", c),
-            Err(e) => println!("{}", e),
+            Ok(c) => writeln!(stdout, "{}", c).unwrap(),
+            Err(e) => writeln!(stderr, "{}", e).unwrap(),
         },
+
         "echo" => {
-            if let Some(file) = cmd.stdout {
-                file_write(&file, &echo(&args));
-            } else {
-                println!("{}", &echo(&args));
-            }
+            writeln!(stdout, "{}", &echo(&args)).unwrap();
         }
+
         "type" => match command_type(&args) {
-            Ok(c) => println!("{}", c),
-            Err(e) => println!("{}", e),
+            Ok(c) => writeln!(stdout, "{}", c).unwrap(),
+            Err(e) => writeln!(stderr, "{}", e).unwrap(),
         },
+
         _ => match &exec(&command, &args) {
             Ok((out, err)) => {
                 if !out.is_empty() {
-                    if let Some(file) = cmd.stdout {
-                        file_write(&file, &out);
-                    } else {
-                        println!("{}", out);
-                    }
+                    writeln!(stdout, "{}", out).unwrap();
                 }
-
                 if !err.is_empty() {
-                    if let Some(file) = cmd.stderr {
-                        file_write(&file, &err);
-                    } else {
-                        println!("{}", err)
-                    }
+                    writeln!(stderr, "{}", err).unwrap();
                 }
             }
-            Err(e) => println!("{}", e),
+            Err(e) => writeln!(stderr, "{}", e).unwrap(),
         },
     }
 }
