@@ -31,26 +31,20 @@ pub fn command_type(args: &Vec<String>) -> Result<String, String> {
     }
 }
 
-pub fn exec(command: &String, args: &Vec<String>) -> Result<String, String> {
-    if find_executable_in_path(&command).is_some() {
-        let output = Command::new(&command)
-            .args(args)
-            .output()
-            .map_err(|err| err.to_string())?;
-
-        if output.status.success() {
-            String::from_utf8(output.stdout)
-                .map(|s| s.trim().to_string())
-                .map_err(|err| err.to_string())
-        } else {
-            let err_msg = String::from_utf8(output.stderr)
-                .unwrap_or_else(|_| "Failed to read stderr".to_string());
-
-            Err(err_msg.trim().to_string())
-        }
-    } else {
-        Err(format!("{}: command not found", &command))
+pub fn exec(command: &String, args: &Vec<String>) -> Result<(String, String), String> {
+    if find_executable_in_path(&command).is_none() {
+        return Err(format!("{}: command not found", &command));
     }
+
+    let output = Command::new(&command)
+        .args(args)
+        .output()
+        .map_err(|err| err.to_string())?;
+
+    let stdout = String::from_utf8(output.stdout).unwrap().trim().to_string();
+    let stderr = String::from_utf8(output.stderr).unwrap().trim().to_string();
+
+    Ok((stdout, stderr))
 }
 
 pub fn file_write(filename: &String, content: &String) {

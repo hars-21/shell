@@ -150,11 +150,17 @@ fn run(cmd: ShellCommand) {
             Err(e) => println!("{}", e),
         },
         _ => match &exec(&command, &args) {
-            Ok(c) => {
-                if cmd.append {
-                    file_write(&cmd.filename, c);
-                } else {
-                    println!("{}", c);
+            Ok((out, err)) => {
+                if !out.is_empty() {
+                    if cmd.append {
+                        file_write(&cmd.filename, &out);
+                    } else {
+                        println!("{}", out);
+                    }
+                }
+
+                if !err.is_empty() {
+                    println!("{}", err)
                 }
             }
             Err(e) => println!("{}", e),
