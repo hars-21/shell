@@ -38,7 +38,9 @@ pub fn exec(command: &String, args: &Vec<String>) -> Result<String, String> {
             .output()
             .map_err(|err| err.to_string())?;
 
-        String::from_utf8(output.stdout).map_err(|err| err.to_string())
+        String::from_utf8(output.stdout)
+            .map(|s| s.trim().to_string())
+            .map_err(|err| err.to_string())
     } else {
         Err(format!("{}: command not found", &command))
     }
