@@ -38,9 +38,16 @@ pub fn exec(command: &String, args: &Vec<String>) -> Result<String, String> {
             .output()
             .map_err(|err| err.to_string())?;
 
-        String::from_utf8(output.stdout)
-            .map(|s| s.trim().to_string())
-            .map_err(|err| err.to_string())
+        if output.status.success() {
+            String::from_utf8(output.stdout)
+                .map(|s| s.trim().to_string())
+                .map_err(|err| err.to_string())
+        } else {
+            let err_msg = String::from_utf8(output.stderr)
+                .unwrap_or_else(|_| "Failed to read stderr".to_string());
+
+            Err(err_msg.trim().to_string())
+        }
     } else {
         Err(format!("{}: command not found", &command))
     }
