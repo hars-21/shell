@@ -25,8 +25,13 @@ use codecrafters_shell::{cd, command_type, echo, exec, file_write, pwd};
 struct ShellCommand {
     name: String,
     args: Vec<String>,
-    append: bool,
-    filename: String,
+    stdout: Option<String>,
+    stderr: Option<String>,
+}
+
+enum RedirectType {
+    Stdout,
+    Stderr,
 }
 
 impl ShellCommand {
@@ -34,8 +39,9 @@ impl ShellCommand {
         let mut tokens = Vec::new();
         let mut current = String::new();
         let mut chars = command_line.chars().peekable();
-        let mut append = false;
-        let mut filename = String::new();
+        let mut pending_redirect: Option<RedirectType> = None;
+        let mut stdout: Option<String> = None;
+        let mut stderr: Option<String> = None;
 
         while let Some(c) = chars.next() {
             match c {
@@ -78,9 +84,11 @@ impl ShellCommand {
 
                 ' ' | '\t' => {
                     if !current.is_empty() {
-                        if append {
-                            filename = current.clone();
-                            append = false;
+                        if let Some(rtype) = pending_redirect.take() {
+                            match rtype {
+                                RedirectType::Stdout => stdout = Some(current.clone()),
+                                RedirectType::Stderr => stderr = Some(current.clone()),
+                            }
                         } else {
                             tokens.push(current.clone());
                         }
@@ -91,14 +99,23 @@ impl ShellCommand {
                 '1' => {
                     if let Some('>') = chars.peek() {
                         chars.next();
-                        append = true;
+                        pending_redirect = Some(RedirectType::Stdout);
                     } else {
                         current.push('1');
                     }
                 }
 
+                '2' => {
+                    if let Some('>') = chars.peek() {
+                        chars.next();
+                        pending_redirect = Some(RedirectType::Stderr);
+                    } else {
+                        current.push('2');
+                    }
+                }
+
                 '>' => {
-                    append = true;
+                    pending_redirect = Some(RedirectType::Stdout);
                 }
 
                 _ => current.push(c),
@@ -106,22 +123,24 @@ impl ShellCommand {
         }
 
         if !current.is_empty() {
-            if append {
-                filename = current.clone();
+            if let Some(rtype) = pending_redirect.take() {
+                match rtype {
+                    RedirectType::Stdout => stdout = Some(current.clone()),
+                    RedirectType::Stderr => stderr = Some(current.clone()),
+                }
             } else {
                 tokens.push(current.clone());
             }
             current.clear();
         }
 
-        append = !filename.is_empty();
         let (name, args) = tokens.split_first().unwrap();
 
         Ok(ShellCommand {
             name: name.clone(),
             args: args.to_vec(),
-            append,
-            filename,
+            stdout,
+            stderr,
         })
     }
 }
@@ -139,8 +158,8 @@ fn run(cmd: ShellCommand) {
             Err(e) => println!("{}", e),
         },
         "echo" => {
-            if cmd.append {
-                file_write(&cmd.filename, &echo(&args));
+            if let Some(file) = cmd.stdout {
+                file_write(&file, &echo(&args));
             } else {
                 println!("{}", &echo(&args));
             }
@@ -152,15 +171,19 @@ fn run(cmd: ShellCommand) {
         _ => match &exec(&command, &args) {
             Ok((out, err)) => {
                 if !out.is_empty() {
-                    if cmd.append {
-                        file_write(&cmd.filename, &out);
+                    if let Some(file) = cmd.stdout {
+                        file_write(&file, &out);
                     } else {
                         println!("{}", out);
                     }
                 }
 
                 if !err.is_empty() {
-                    println!("{}", err)
+                    if let Some(file) = cmd.stderr {
+                        file_write(&file, &err);
+                    } else {
+                        println!("{}", err)
+                    }
                 }
             }
             Err(e) => println!("{}", e),
