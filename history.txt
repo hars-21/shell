@@ -1,0 +1,11 @@
+#V2
+echo fhfhf
+cat hello
+ls
+ls > 1.md
+cat 1.md
+cat hello
+exit
+clear
+ls
+exit

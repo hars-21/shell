@@ -1,8 +1,14 @@
+mod helper;
+
 use std::fs::OpenOptions;
 use std::io::{self, Write};
 use std::process;
 
 use codecrafters_shell::{cd, command_type, echo, exec, pwd};
+use rustyline::Editor;
+use rustyline::error::ReadlineError;
+
+use crate::helper::ShellHelper;
 
 // enum Builtin {
 //     Cd,
@@ -225,26 +231,41 @@ fn run(cmd: ShellCommand) {
 }
 
 fn main() {
+    let mut rl = Editor::new().unwrap();
+    rl.set_helper(Some(ShellHelper));
+
     loop {
-        print!("$ ");
-        io::stdout().flush().unwrap();
-        let mut command_line = String::new();
-        io::stdin().read_line(&mut command_line).unwrap();
-        command_line = command_line.trim().to_string();
+        let readline = rl.readline("$ ");
+        match readline {
+            Ok(line) => {
+                if line.is_empty() {
+                    continue;
+                }
 
-        if command_line.is_empty() {
-            continue;
+                if line == "exit" {
+                    break;
+                }
+
+                let cmd = ShellCommand::build(&line).unwrap_or_else(|err| {
+                    eprintln!("Error parsing arguments: {err}");
+                    process::exit(1);
+                });
+
+                run(cmd);
+            }
+
+            Err(ReadlineError::Interrupted) => {
+                break;
+            }
+
+            Err(ReadlineError::Eof) => {
+                break;
+            }
+
+            Err(err) => {
+                println!("Error: {:?}", err);
+                break;
+            }
         }
-
-        if command_line == "exit" {
-            break;
-        }
-
-        let cmd = ShellCommand::build(&command_line).unwrap_or_else(|err| {
-            eprintln!("Error parsing arguments: {err}");
-            process::exit(1);
-        });
-
-        run(cmd);
     }
 }
