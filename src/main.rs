@@ -1,4 +1,4 @@
-use std::fs::File;
+use std::fs::OpenOptions;
 use std::io::{self, Write};
 use std::process;
 
@@ -28,6 +28,7 @@ struct ShellCommand {
     args: Vec<String>,
     stdout: Option<String>,
     stderr: Option<String>,
+    append: bool,
 }
 
 enum RedirectType {
@@ -43,6 +44,7 @@ impl ShellCommand {
         let mut pending_redirect: Option<RedirectType> = None;
         let mut stdout: Option<String> = None;
         let mut stderr: Option<String> = None;
+        let mut append = false;
 
         while let Some(c) = chars.next() {
             match c {
@@ -101,6 +103,10 @@ impl ShellCommand {
                     if let Some('>') = chars.peek() {
                         chars.next();
                         pending_redirect = Some(RedirectType::Stdout);
+                        if let Some('>') = chars.peek() {
+                            chars.next();
+                            append = true;
+                        }
                     } else {
                         current.push('1');
                     }
@@ -110,13 +116,23 @@ impl ShellCommand {
                     if let Some('>') = chars.peek() {
                         chars.next();
                         pending_redirect = Some(RedirectType::Stderr);
+                        if let Some('>') = chars.peek() {
+                            chars.next();
+                            append = true;
+                        }
                     } else {
                         current.push('2');
                     }
                 }
 
                 '>' => {
-                    pending_redirect = Some(RedirectType::Stdout);
+                    if let Some('>') = chars.peek() {
+                        chars.next();
+                        pending_redirect = Some(RedirectType::Stdout);
+                        append = true;
+                    } else {
+                        pending_redirect = Some(RedirectType::Stdout);
+                    }
                 }
 
                 _ => current.push(c),
@@ -142,18 +158,33 @@ impl ShellCommand {
             args: args.to_vec(),
             stdout,
             stderr,
+            append,
         })
     }
 }
 
 fn run(cmd: ShellCommand) {
     let mut stdout: Box<dyn Write> = match cmd.stdout {
-        Some(file) => Box::new(File::create(file).unwrap()),
+        Some(file) => Box::new(
+            OpenOptions::new()
+                .create(true)
+                .write(true)
+                .append(cmd.append)
+                .open(file)
+                .unwrap(),
+        ),
         None => Box::new(io::stdout()),
     };
 
     let mut stderr: Box<dyn Write> = match cmd.stderr {
-        Some(file) => Box::new(File::create(file).unwrap()),
+        Some(file) => Box::new(
+            OpenOptions::new()
+                .create(true)
+                .write(true)
+                .append(cmd.append)
+                .open(file)
+                .unwrap(),
+        ),
         None => Box::new(io::stderr()),
     };
 
