@@ -233,11 +233,13 @@ fn run(cmd: ShellCommand) {
 fn main() {
     let mut rl = Editor::new().unwrap();
     rl.set_helper(Some(ShellHelper::new()));
+    rl.load_history("history.txt").unwrap_or_default();
 
     loop {
         let readline = rl.readline("$ ");
         match readline {
             Ok(line) => {
+                rl.add_history_entry(&line).unwrap();
                 if line.is_empty() {
                     continue;
                 }
@@ -268,4 +270,6 @@ fn main() {
             }
         }
     }
+
+    rl.append_history("history.txt").unwrap_or_default();
 }
