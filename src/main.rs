@@ -232,7 +232,7 @@ fn run(cmd: ShellCommand) {
 
 fn main() {
     let mut rl = Editor::new().unwrap();
-    rl.set_helper(Some(ShellHelper));
+    rl.set_helper(Some(ShellHelper::new()));
 
     loop {
         let readline = rl.readline("$ ");
