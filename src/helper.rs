@@ -28,7 +28,7 @@ impl Completer for ShellHelper {
             .iter()
             .filter(|cmd| cmd.starts_with(input))
             .map(|cmd| {
-                let replacement = format!("{cmd}");
+                let replacement = format!("{cmd} ");
                 Pair {
                     display: replacement.clone(),
                     replacement,
