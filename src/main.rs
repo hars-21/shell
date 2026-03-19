@@ -5,8 +5,8 @@ use std::io::{self, Write};
 use std::process;
 
 use codecrafters_shell::{cd, command_type, echo, exec, pwd};
-use rustyline::Editor;
 use rustyline::error::ReadlineError;
+use rustyline::{Config, Editor};
 
 use crate::helper::ShellHelper;
 
@@ -231,7 +231,10 @@ fn run(cmd: ShellCommand) {
 }
 
 fn main() {
-    let mut rl = Editor::new().unwrap();
+    let config = Config::builder()
+        .completion_type(rustyline::CompletionType::List)
+        .build();
+    let mut rl = Editor::with_config(config).unwrap();
     rl.set_helper(Some(ShellHelper::new()));
     rl.load_history("history.txt").unwrap_or_default();
 
