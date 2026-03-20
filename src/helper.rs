@@ -52,9 +52,12 @@ impl Completer for ShellHelper {
 
         let pairs = matches
             .into_iter()
-            .map(|cmd: String| Pair {
-                display: cmd.clone(),
-                replacement: cmd,
+            .map(|cmd: String| {
+                let replacement = format!("{cmd} ");
+                Pair {
+                    display: replacement.clone(),
+                    replacement: replacement,
+                }
             })
             .collect();
 
