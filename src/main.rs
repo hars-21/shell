@@ -6,7 +6,7 @@ use std::process;
 
 use codecrafters_shell::{cd, command_type, echo, exec, pwd};
 use rustyline::error::ReadlineError;
-use rustyline::{CompletionType, Config, Editor};
+use rustyline::{CompletionType, Config, DefaultEditor, Editor};
 
 use crate::helper::ShellHelper;
 
@@ -151,6 +151,9 @@ impl ShellCommand {
 }
 
 fn run(cmd: ShellCommand) {
+    let mut rl = DefaultEditor::new().unwrap();
+    rl.load_history("history.txt").unwrap_or_default();
+
     let mut stdout: Box<dyn Write> = match cmd.stdout {
         Some(file) => Box::new(
             OpenOptions::new()
@@ -196,6 +199,12 @@ fn run(cmd: ShellCommand) {
             Ok(c) => writeln!(stdout, "{}", c).unwrap(),
             Err(e) => writeln!(stderr, "{}", e).unwrap(),
         },
+
+        "history" => {
+            for (index, line) in rl.history().iter().enumerate() {
+                writeln!(stdout, "  {} {}", index, line).unwrap();
+            }
+        }
 
         _ => match &exec(&command, &args) {
             Ok((out, err)) => {
