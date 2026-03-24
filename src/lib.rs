@@ -23,7 +23,9 @@ pub fn echo(args: &Vec<String>) -> String {
 
 pub fn command_type(args: &Vec<String>) -> Result<String, String> {
     match args[0].as_str() {
-        "exit" | "echo" | "type" | "pwd" | "cd" => Ok(format!("{} is a shell builtin", args[0])),
+        "exit" | "echo" | "type" | "pwd" | "cd" | "history" => {
+            Ok(format!("{} is a shell builtin", args[0]))
+        }
         _ => match find_executable_in_path(&args[0]) {
             Some(path) => Ok(format!("{} is {}", args[0], path.display())),
             None => Err(format!("{}: not found", args[0])),

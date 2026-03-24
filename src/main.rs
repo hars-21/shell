@@ -10,25 +10,6 @@ use rustyline::{CompletionType, Config, Editor};
 
 use crate::helper::ShellHelper;
 
-// enum Builtin {
-//     Cd,
-//     Echo,
-//     Pwd,
-//     Type,
-// }
-
-// impl Builtin {
-//     fn from_str(s: &str) -> Option<Builtin> {
-//         match s {
-//             "cd" => Some(Builtin::Cd),
-//             "echo" => Some(Builtin::Echo),
-//             "pwd" => Some(Builtin::Pwd),
-//             "type" => Some(Builtin::Type),
-//             _ => None,
-//         }
-//     }
-// }
-
 struct ShellCommand {
     name: String,
     args: Vec<String>,
