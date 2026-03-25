@@ -1,4 +1,5 @@
 use pathsearch::find_executable_in_path;
+use rustyline::history::{FileHistory, History};
 use std::{env, process::Command};
 
 pub fn cd(args: &Vec<String>) -> Result<(), String> {
@@ -47,6 +48,21 @@ pub fn exec(command: &String, args: &Vec<String>) -> Result<(String, String), St
     let stderr = String::from_utf8(output.stderr).unwrap().trim().to_string();
 
     Ok((stdout, stderr))
+}
+
+pub fn history(history: &mut FileHistory, args: &[String]) {
+    if args.first().is_some_and(|arg| arg == "-r") {
+        history.load(std::path::Path::new(&args[1])).unwrap();
+        return;
+    }
+    let history_length = history.len();
+    let limit: usize = args
+        .first()
+        .map_or(history_length, |n| n.parse().unwrap())
+        .min(history_length);
+    for (i, record) in history.iter().enumerate().skip(history_length - limit) {
+        println!("  {} {}", i + 1, record)
+    }
 }
 
 #[cfg(test)]

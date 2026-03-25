@@ -4,9 +4,9 @@ use std::fs::OpenOptions;
 use std::io::{self, Write};
 use std::process;
 
-use codecrafters_shell::{cd, command_type, echo, exec, pwd};
+use codecrafters_shell::{cd, command_type, echo, exec, history, pwd};
 use rustyline::error::ReadlineError;
-use rustyline::history::{FileHistory, History};
+use rustyline::history::FileHistory;
 use rustyline::{CompletionType, Config, Editor};
 
 use crate::helper::ShellHelper;
@@ -199,14 +199,7 @@ fn run(cmd: ShellCommand, rl: &mut Editor<ShellHelper, FileHistory>) {
         },
 
         "history" => {
-            let history_length = rl.history().len();
-            let limit = args
-                .first()
-                .map_or(history_length, |n| n.parse().unwrap())
-                .min(history_length);
-            for (index, line) in rl.history().iter().enumerate().skip(history_length - limit) {
-                writeln!(stdout, "  {} {}", index + 1, line).unwrap();
-            }
+            history(rl.history_mut(), &args);
         }
 
         _ => match &exec(&command, &args) {
