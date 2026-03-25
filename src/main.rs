@@ -6,7 +6,8 @@ use std::process;
 
 use codecrafters_shell::{cd, command_type, echo, exec, pwd};
 use rustyline::error::ReadlineError;
-use rustyline::{CompletionType, Config, DefaultEditor, Editor};
+use rustyline::history::{FileHistory, History};
+use rustyline::{CompletionType, Config, Editor};
 
 use crate::helper::ShellHelper;
 
@@ -150,10 +151,7 @@ impl ShellCommand {
     }
 }
 
-fn run(cmd: ShellCommand) {
-    let mut rl = DefaultEditor::new().unwrap();
-    rl.load_history("history.txt").unwrap_or_default();
-
+fn run(cmd: ShellCommand, rl: &mut Editor<ShellHelper, FileHistory>) {
     let mut stdout: Box<dyn Write> = match cmd.stdout {
         Some(file) => Box::new(
             OpenOptions::new()
@@ -201,8 +199,13 @@ fn run(cmd: ShellCommand) {
         },
 
         "history" => {
-            for (index, line) in rl.history().iter().enumerate() {
-                writeln!(stdout, "  {} {}", index, line).unwrap();
+            let history_length = rl.history().len();
+            let limit = args
+                .first()
+                .map_or(history_length, |n| n.parse().unwrap())
+                .min(history_length);
+            for (index, line) in rl.history().iter().enumerate().skip(history_length - limit) {
+                writeln!(stdout, "  {} {}", index + 1, line).unwrap();
             }
         }
 
@@ -247,7 +250,7 @@ fn main() {
                     process::exit(1);
                 });
 
-                run(cmd);
+                run(cmd, &mut rl);
             }
 
             Err(ReadlineError::Interrupted) => {
