@@ -1,5 +1,6 @@
 use pathsearch::find_executable_in_path;
 use rustyline::history::{FileHistory, History};
+use std::io::{BufWriter, Write};
 use std::{env, process::Command};
 
 pub fn cd(args: &Vec<String>) -> Result<(), String> {
@@ -55,6 +56,15 @@ pub fn history(history: &mut FileHistory, args: &[String]) {
         history.load(std::path::Path::new(&args[1])).unwrap();
         return;
     }
+
+    if args.first().is_some_and(|arg| arg == "-w") {
+        let mut output = BufWriter::new(std::fs::File::create(&args[1]).unwrap());
+        for record in history.iter() {
+            writeln!(&mut output, "{record}").unwrap();
+        }
+        return;
+    }
+
     let history_length = history.len();
     let limit: usize = args
         .first()
