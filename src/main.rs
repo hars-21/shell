@@ -224,8 +224,8 @@ fn main() {
     let mut rl = Editor::with_config(config).unwrap();
     rl.set_helper(Some(ShellHelper::new()));
 
-    if env::var("HISTFILE").is_ok() {
-        rl.load_history("history.txt").unwrap_or_default();
+    if let Ok(history_file_path) = env::var("HISTFILE") {
+        rl.load_history(&history_file_path).unwrap_or_default();
     }
 
     loop {
