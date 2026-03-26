@@ -2,7 +2,7 @@ mod helper;
 
 use std::fs::OpenOptions;
 use std::io::{self, Write};
-use std::process;
+use std::{env, process};
 
 use codecrafters_shell::{cd, command_type, echo, exec, history, pwd};
 use rustyline::error::ReadlineError;
@@ -223,7 +223,10 @@ fn main() {
 
     let mut rl = Editor::with_config(config).unwrap();
     rl.set_helper(Some(ShellHelper::new()));
-    rl.load_history("history.txt").unwrap_or_default();
+
+    if env::var("HISTFILE").is_ok() {
+        rl.load_history("history.txt").unwrap_or_default();
+    }
 
     loop {
         let readline = rl.readline("$ ");
