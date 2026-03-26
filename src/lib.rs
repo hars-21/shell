@@ -1,5 +1,6 @@
 use pathsearch::find_executable_in_path;
 use rustyline::history::{FileHistory, History};
+use std::fs::OpenOptions;
 use std::io::{BufWriter, Write};
 use std::{env, process::Command};
 
@@ -60,6 +61,28 @@ pub fn history(history: &mut FileHistory, args: &[String]) {
     if args.first().is_some_and(|arg| arg == "-w") {
         let mut output = BufWriter::new(std::fs::File::create(&args[1]).unwrap());
         for record in history.iter() {
+            writeln!(&mut output, "{record}").unwrap();
+        }
+        return;
+    }
+
+    if args.first().is_some_and(|arg| arg == "-a") {
+        let mut output = BufWriter::new(
+            OpenOptions::new()
+                .create(true)
+                .append(true)
+                .open(&args[1])
+                .unwrap(),
+        );
+        let since_idx = history
+            .search(
+                &format!("history -a {}", args[1]),
+                history.len().saturating_sub(2),
+                rustyline::history::SearchDirection::Reverse,
+            )
+            .unwrap()
+            .map_or(0, |search_result| search_result.idx + 1);
+        for record in history.iter().skip(since_idx) {
             writeln!(&mut output, "{record}").unwrap();
         }
         return;
