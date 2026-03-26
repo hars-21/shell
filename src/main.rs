@@ -264,5 +264,14 @@ fn main() {
         }
     }
 
-    rl.append_history("history.txt").unwrap_or_default();
+    // if let Ok(history_file_path) = env::var("HISTFILE") {
+    //     rl.append_history(&history_file_path).unwrap_or_default();
+    // }
+
+    if let Some(histfile) = std::env::var_os("HISTFILE") {
+        let mut output = io::BufWriter::new(std::fs::File::create(&histfile).unwrap());
+        for record in rl.history().iter() {
+            writeln!(&mut output, "{record}").unwrap();
+        }
+    }
 }
