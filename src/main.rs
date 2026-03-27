@@ -5,9 +5,10 @@ use std::io::{self, Write};
 use std::{env, process};
 
 use codecrafters_shell::{cd, command_type, echo, exec, history, pwd};
+use rustyline::config::BellStyle;
 use rustyline::error::ReadlineError;
 use rustyline::history::FileHistory;
-use rustyline::{CompletionType, Config, Editor};
+use rustyline::{CompletionType, Config, EditMode, Editor};
 
 use crate::helper::ShellHelper;
 
@@ -218,7 +219,10 @@ fn run(cmd: ShellCommand, rl: &mut Editor<ShellHelper, FileHistory>) {
 
 fn main() {
     let config = Config::builder()
+        .history_ignore_space(true)
         .completion_type(CompletionType::List)
+        .edit_mode(EditMode::Vi)
+        .bell_style(BellStyle::Audible)
         .build();
 
     let mut rl = Editor::with_config(config).unwrap();
