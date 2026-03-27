@@ -1,6 +1,6 @@
 use std::env;
 
-use rustyline::completion::{Completer, Pair};
+use rustyline::completion::{Completer, FilenameCompleter, Pair, extract_word};
 use rustyline::highlight::Highlighter;
 use rustyline::hint::Hinter;
 use rustyline::validate::Validator;
@@ -10,12 +10,14 @@ const BUILTINS: &[&str] = &["cd", "echo", "exit", "pwd", "type", "history"];
 
 pub struct ShellHelper {
     path_executables: Vec<String>,
+    filenames: FilenameCompleter,
 }
 
 impl ShellHelper {
     pub fn new() -> Self {
         Self {
             path_executables: list_path_executables(),
+            filenames: FilenameCompleter::new(),
         }
     }
 }
@@ -33,35 +35,44 @@ impl Validator for ShellHelper {}
 impl Completer for ShellHelper {
     type Candidate = Pair;
 
-    fn complete(&self, line: &str, pos: usize, _ctx: &Context<'_>) -> Result<(usize, Vec<Pair>)> {
-        let input = &line[..pos];
-        let start = input.rfind(char::is_whitespace).map(|i| i + 1).unwrap_or(0);
+    fn complete(&self, line: &str, pos: usize, ctx: &Context<'_>) -> Result<(usize, Vec<Pair>)> {
+        let (start, prefix) = extract_word(line, pos, None, |c| c == ' ');
+        let first_word = line[..start].trim().is_empty();
 
-        let word = &input[start..];
+        if first_word {
+            let mut matches: Vec<String> = BUILTINS
+                .iter()
+                .copied()
+                .chain(self.path_executables.iter().map(|p| p.as_str()))
+                .filter(|cmd| cmd.starts_with(prefix))
+                .map(|cmd| cmd.to_string())
+                .collect();
 
-        let mut matches: Vec<String> = BUILTINS
-            .iter()
-            .copied()
-            .chain(self.path_executables.iter().map(|p| p.as_str()))
-            .filter(|cmd| cmd.starts_with(word))
-            .map(|cmd| cmd.to_string())
-            .collect();
+            matches.sort();
+            matches.dedup();
 
-        matches.sort();
-        matches.dedup();
+            let pairs = matches
+                .into_iter()
+                .map(|cmd: String| {
+                    let replacement = format!("{cmd} ");
+                    Pair {
+                        display: replacement.clone(),
+                        replacement: replacement,
+                    }
+                })
+                .collect();
 
-        let pairs = matches
-            .into_iter()
-            .map(|cmd: String| {
-                let replacement = format!("{cmd} ");
-                Pair {
-                    display: replacement.clone(),
-                    replacement: replacement,
+            Ok((start, pairs))
+        } else {
+            let (start, mut pairs) = self.filenames.complete(line, pos, ctx)?;
+            for pair in &mut pairs {
+                if !pair.replacement.ends_with('/') && !pair.replacement.ends_with(' ') {
+                    pair.replacement.push(' ');
                 }
-            })
-            .collect();
+            }
 
-        Ok((start, pairs))
+            Ok((start, pairs))
+        }
     }
 }
 
