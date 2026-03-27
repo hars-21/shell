@@ -1,4 +1,4 @@
-use std::env;
+use std::{env, path::Path};
 
 use rustyline::completion::{Completer, FilenameCompleter, Pair, extract_word};
 use rustyline::highlight::Highlighter;
@@ -66,8 +66,17 @@ impl Completer for ShellHelper {
         } else {
             let (start, mut pairs) = self.filenames.complete(line, pos, ctx)?;
             for pair in &mut pairs {
-                if !pair.replacement.ends_with('/') && !pair.replacement.ends_with(' ') {
-                    pair.replacement.push(' ');
+                let path = Path::new(&pair.replacement);
+
+                if path.is_dir() {
+                    if !pair.replacement.ends_with('/') {
+                        pair.replacement.push('/');
+                        pair.display.push('/');
+                    }
+                } else {
+                    if !pair.replacement.ends_with(' ') {
+                        pair.replacement.push(' ');
+                    }
                 }
             }
 
