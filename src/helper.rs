@@ -66,18 +66,21 @@ impl Completer for ShellHelper {
         } else {
             let (start, mut pairs) = self.filenames.complete(line, pos, ctx)?;
             for pair in &mut pairs {
-                let path = Path::new(&pair.replacement);
+                let path = std::env::current_dir()
+                    .map(|cwd| cwd.join(&pair.replacement))
+                    .unwrap_or_else(|_| Path::new(&pair.replacement).to_path_buf());
 
                 if path.is_dir() {
                     if !pair.replacement.ends_with('/') {
                         pair.replacement.push('/');
-                        pair.display.push('/');
                     }
                 } else {
                     if !pair.replacement.ends_with(' ') {
                         pair.replacement.push(' ');
                     }
                 }
+
+                pair.display = pair.replacement.clone();
             }
 
             Ok((start, pairs))
