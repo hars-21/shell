@@ -1,6 +1,6 @@
-use std::{env, path::Path};
+use std::{env, path::PathBuf};
 
-use rustyline::completion::{Completer, FilenameCompleter, Pair, extract_word};
+use rustyline::completion::{Completer, Pair, extract_word};
 use rustyline::highlight::Highlighter;
 use rustyline::hint::Hinter;
 use rustyline::validate::Validator;
@@ -10,41 +10,36 @@ const BUILTINS: &[&str] = &["cd", "echo", "exit", "pwd", "type", "history"];
 
 pub struct ShellHelper {
     path_executables: Vec<String>,
-    filenames: FilenameCompleter,
 }
 
 impl ShellHelper {
     pub fn new() -> Self {
         Self {
             path_executables: list_path_executables(),
-            filenames: FilenameCompleter::new(),
         }
     }
 }
 
 impl Helper for ShellHelper {}
-
 impl Hinter for ShellHelper {
     type Hint = String;
 }
-
 impl Highlighter for ShellHelper {}
-
 impl Validator for ShellHelper {}
 
 impl Completer for ShellHelper {
     type Candidate = Pair;
 
-    fn complete(&self, line: &str, pos: usize, ctx: &Context<'_>) -> Result<(usize, Vec<Pair>)> {
-        let (start, prefix) = extract_word(line, pos, None, |c| c == ' ');
+    fn complete(&self, line: &str, pos: usize, _ctx: &Context<'_>) -> Result<(usize, Vec<Pair>)> {
+        let (start, word) = extract_word(line, pos, None, |c| c == ' ');
         let first_word = line[..start].trim().is_empty();
 
         if first_word {
             let mut matches: Vec<String> = BUILTINS
                 .iter()
                 .copied()
-                .chain(self.path_executables.iter().map(|p| p.as_str()))
-                .filter(|cmd| cmd.starts_with(prefix))
+                .chain(self.path_executables.iter().map(|s| s.as_str()))
+                .filter(|cmd| cmd.starts_with(word))
                 .map(|cmd| cmd.to_string())
                 .collect();
 
@@ -53,52 +48,82 @@ impl Completer for ShellHelper {
 
             let pairs = matches
                 .into_iter()
-                .map(|cmd: String| {
+                .map(|cmd| {
                     let replacement = format!("{cmd} ");
                     Pair {
                         display: replacement.clone(),
-                        replacement: replacement,
+                        replacement,
                     }
                 })
                 .collect();
 
-            Ok((start, pairs))
-        } else {
-            let (start, mut pairs) = self.filenames.complete(line, pos, ctx)?;
-            for pair in &mut pairs {
-                let path = std::env::current_dir()
-                    .map(|cwd| cwd.join(&pair.replacement))
-                    .unwrap_or_else(|_| Path::new(&pair.replacement).to_path_buf());
-
-                if path.is_dir() {
-                    if !pair.replacement.ends_with('/') {
-                        pair.replacement.push('/');
-                    }
-                } else {
-                    if !pair.replacement.ends_with(' ') {
-                        pair.replacement.push(' ');
-                    }
-                }
-
-                pair.display = pair.replacement.clone();
-            }
-
-            Ok((start, pairs))
+            return Ok((start, pairs));
         }
+
+        let (base_dir, prefix) = match word.rfind('/') {
+            Some(idx) => (&word[..=idx], &word[idx + 1..]),
+            None => ("", word),
+        };
+
+        let dir: PathBuf = if base_dir.is_empty() {
+            env::current_dir().unwrap_or_else(|_| PathBuf::from("."))
+        } else {
+            env::current_dir()
+                .map(|cwd| cwd.join(base_dir))
+                .unwrap_or_else(|_| PathBuf::from(base_dir))
+        };
+
+        let mut pairs = Vec::new();
+
+        if let Ok(entries) = dir.read_dir() {
+            for entry in entries.flatten() {
+                let file_name = entry.file_name();
+                let name = file_name.to_string_lossy();
+
+                if name.starts_with(prefix) {
+                    let mut replacement = format!("{}{}", base_dir, name);
+
+                    if entry.path().is_dir() {
+                        if !replacement.ends_with('/') {
+                            replacement.push('/');
+                        }
+                    } else {
+                        if !replacement.ends_with(' ') {
+                            replacement.push(' ');
+                        }
+                    }
+
+                    pairs.push(Pair {
+                        display: replacement.clone(),
+                        replacement,
+                    });
+                }
+            }
+        }
+
+        if pairs.is_empty() {
+            return Ok((start, vec![]));
+        }
+
+        pairs.sort_by(|a, b| a.display.cmp(&b.display));
+
+        Ok((start, pairs))
     }
 }
 
 fn list_path_executables() -> Vec<String> {
     let mut executables = Vec::new();
 
-    for path in env::split_paths(&env::var_os("PATH").unwrap_or_default()) {
-        if let Ok(entries) = path.read_dir() {
-            for entry in entries.flatten() {
-                let path = entry.path();
+    if let Some(paths) = env::var_os("PATH") {
+        for path in env::split_paths(&paths) {
+            if let Ok(entries) = path.read_dir() {
+                for entry in entries.flatten() {
+                    let path = entry.path();
 
-                if path.is_file() {
-                    if let Some(name) = path.file_name().and_then(|n| n.to_str()) {
-                        executables.push(name.to_string());
+                    if path.is_file() {
+                        if let Some(name) = path.file_name().and_then(|n| n.to_str()) {
+                            executables.push(name.to_string());
+                        }
                     }
                 }
             }
