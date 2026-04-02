@@ -4,7 +4,7 @@ use std::fs::OpenOptions;
 use std::io::{self, Write};
 use std::{env, process};
 
-use codecrafters_shell::{cd, command_type, echo, exec, history, pwd};
+use codecrafters_shell::{cd, command_type, echo, exec, history, jobs, pwd};
 use rustyline::config::BellStyle;
 use rustyline::error::ReadlineError;
 use rustyline::history::FileHistory;
@@ -202,6 +202,8 @@ fn run(cmd: ShellCommand, rl: &mut Editor<ShellHelper, FileHistory>) {
         "history" => {
             history(rl.history_mut(), &args);
         }
+
+        "jobs" => jobs(),
 
         _ => match &exec(&command, &args) {
             Ok((out, err)) => {

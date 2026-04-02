@@ -26,7 +26,7 @@ pub fn echo(args: &Vec<String>) -> String {
 
 pub fn command_type(args: &Vec<String>) -> Result<String, String> {
     match args[0].as_str() {
-        "exit" | "echo" | "type" | "pwd" | "cd" | "history" => {
+        "exit" | "echo" | "type" | "pwd" | "cd" | "history" | "jobs" => {
             Ok(format!("{} is a shell builtin", args[0]))
         }
         _ => match find_executable_in_path(&args[0]) {
@@ -97,6 +97,8 @@ pub fn history(history: &mut FileHistory, args: &[String]) {
         println!("  {} {}", i + 1, record)
     }
 }
+
+pub fn jobs() {}
 
 #[cfg(test)]
 mod tests {
