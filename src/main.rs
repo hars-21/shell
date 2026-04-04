@@ -1,156 +1,18 @@
 mod helper;
+mod parser;
 
 use std::fs::OpenOptions;
 use std::io::{self, Write};
-use std::{env, process};
+use std::process;
 
-use codecrafters_shell::{cd, command_type, echo, exec, history, jobs, pwd};
 use rustyline::config::BellStyle;
 use rustyline::error::ReadlineError;
 use rustyline::history::FileHistory;
 use rustyline::{CompletionType, Config, EditMode, Editor};
+use shell::{cd, command_type, echo, exec, history, jobs, pwd};
 
 use crate::helper::ShellHelper;
-
-struct ShellCommand {
-    name: String,
-    args: Vec<String>,
-    stdout: Option<String>,
-    stderr: Option<String>,
-    append: bool,
-}
-
-enum RedirectType {
-    Stdout,
-    Stderr,
-}
-
-impl ShellCommand {
-    fn build(command_line: &str) -> Result<ShellCommand, &str> {
-        let mut tokens = Vec::new();
-        let mut current = String::new();
-        let mut chars = command_line.chars().peekable();
-        let mut pending_redirect: Option<RedirectType> = None;
-        let mut stdout: Option<String> = None;
-        let mut stderr: Option<String> = None;
-        let mut append = false;
-
-        while let Some(c) = chars.next() {
-            match c {
-                '\'' => {
-                    while let Some(c) = chars.next() {
-                        if c == '\'' {
-                            break;
-                        } else {
-                            current.push(c);
-                        }
-                    }
-                }
-
-                '"' => {
-                    while let Some(c) = chars.next() {
-                        if c == '"' {
-                            break;
-                        }
-                        if c == '\\' {
-                            if let Some(next) = chars.next() {
-                                match next {
-                                    '"' | '\\' | '$' | '\n' => current.push(next),
-                                    _ => {
-                                        current.push('\\');
-                                        current.push(next);
-                                    }
-                                }
-                            }
-                        } else {
-                            current.push(c);
-                        }
-                    }
-                }
-
-                '\\' => {
-                    if let Some(next) = chars.next() {
-                        current.push(next);
-                    }
-                }
-
-                ' ' | '\t' => {
-                    if !current.is_empty() {
-                        if let Some(rtype) = pending_redirect.take() {
-                            match rtype {
-                                RedirectType::Stdout => stdout = Some(current.clone()),
-                                RedirectType::Stderr => stderr = Some(current.clone()),
-                            }
-                        } else {
-                            tokens.push(current.clone());
-                        }
-                        current.clear();
-                    }
-                }
-
-                '1' => {
-                    if let Some('>') = chars.peek() {
-                        chars.next();
-                        pending_redirect = Some(RedirectType::Stdout);
-                        if let Some('>') = chars.peek() {
-                            chars.next();
-                            append = true;
-                        }
-                    } else {
-                        current.push('1');
-                    }
-                }
-
-                '2' => {
-                    if let Some('>') = chars.peek() {
-                        chars.next();
-                        pending_redirect = Some(RedirectType::Stderr);
-                        if let Some('>') = chars.peek() {
-                            chars.next();
-                            append = true;
-                        }
-                    } else {
-                        current.push('2');
-                    }
-                }
-
-                '>' => {
-                    if let Some('>') = chars.peek() {
-                        chars.next();
-                        pending_redirect = Some(RedirectType::Stdout);
-                        append = true;
-                    } else {
-                        pending_redirect = Some(RedirectType::Stdout);
-                    }
-                }
-
-                _ => current.push(c),
-            }
-        }
-
-        if !current.is_empty() {
-            if let Some(rtype) = pending_redirect.take() {
-                match rtype {
-                    RedirectType::Stdout => stdout = Some(current.clone()),
-                    RedirectType::Stderr => stderr = Some(current.clone()),
-                }
-            } else {
-                tokens.push(current.clone());
-            }
-            current.clear();
-        }
-
-        let (name, args) = tokens.split_first().unwrap();
-
-        Ok(ShellCommand {
-            name: name.clone(),
-            args: args.to_vec(),
-            stdout,
-            stderr,
-            append,
-        })
-    }
-}
+use crate::parser::ShellCommand;
 
 fn run(cmd: ShellCommand, rl: &mut Editor<ShellHelper, FileHistory>) {
     let mut stdout: Box<dyn Write> = match cmd.stdout {
@@ -229,10 +91,7 @@ fn main() {
 
     let mut rl = Editor::with_config(config).unwrap();
     rl.set_helper(Some(ShellHelper::new()));
-
-    if let Ok(history_file_path) = env::var("HISTFILE") {
-        rl.load_history(&history_file_path).unwrap_or_default();
-    }
+    rl.load_history("history.txt").unwrap_or_default();
 
     loop {
         let readline = rl.readline("$ ");
@@ -270,14 +129,5 @@ fn main() {
         }
     }
 
-    // if let Ok(history_file_path) = env::var("HISTFILE") {
-    //     rl.append_history(&history_file_path).unwrap_or_default();
-    // }
-
-    if let Some(histfile) = std::env::var_os("HISTFILE") {
-        let mut output = io::BufWriter::new(std::fs::File::create(&histfile).unwrap());
-        for record in rl.history().iter() {
-            writeln!(&mut output, "{record}").unwrap();
-        }
-    }
+    rl.append_history("history.txt").unwrap_or_default();
 }
