@@ -6,7 +6,19 @@ use rustyline::hint::Hinter;
 use rustyline::validate::Validator;
 use rustyline::{Context, Helper, Result};
 
-const BUILTINS: &[&str] = &["cd", "echo", "exit", "pwd", "type", "history", "jobs"];
+const BUILTINS: &[&str] = &[
+    "cd",
+    "echo",
+    "exit",
+    "pwd",
+    "type",
+    "history",
+    "jobs",
+    "savecheck",
+    "runcheck",
+    "listchecks",
+    "delcheck",
+];
 
 pub struct ShellHelper {
     path_executables: Vec<String>,

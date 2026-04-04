@@ -1,8 +1,10 @@
 use pathsearch::find_executable_in_path;
 use rustyline::history::{FileHistory, History};
-use std::fs::OpenOptions;
+use std::fs::{self, OpenOptions};
 use std::io::{BufWriter, Write};
 use std::{env, process::Command};
+
+const CHECKS_FILE: &str = "checks.txt";
 
 pub fn cd(args: &Vec<String>) -> Result<(), String> {
     let target = if args[0] == "~" {
@@ -26,9 +28,8 @@ pub fn echo(args: &Vec<String>) -> String {
 
 pub fn command_type(args: &Vec<String>) -> Result<String, String> {
     match args[0].as_str() {
-        "exit" | "echo" | "type" | "pwd" | "cd" | "history" | "jobs" => {
-            Ok(format!("{} is a shell builtin", args[0]))
-        }
+        "exit" | "echo" | "type" | "pwd" | "cd" | "history" | "jobs" | "savecheck" | "runcheck"
+        | "listchecks" | "delcheck" => Ok(format!("{} is a shell builtin", args[0])),
         _ => match find_executable_in_path(&args[0]) {
             Some(path) => Ok(format!("{} is {}", args[0], path.display())),
             None => Err(format!("{}: not found", args[0])),
@@ -100,6 +101,118 @@ pub fn history(history: &mut FileHistory, args: &[String]) {
 
 pub fn jobs() {}
 
+pub fn savecheck(args: &Vec<String>) -> Result<String, String> {
+    if args.len() < 2 {
+        return Err("usage: savecheck <name> <command>".to_string());
+    }
+
+    let name = args[0].clone();
+    let command = args[1..].join(" ");
+
+    if name.contains('|') {
+        return Err("check name cannot contain |".to_string());
+    }
+
+    let content = fs::read_to_string(CHECKS_FILE).unwrap_or_default();
+    let mut lines: Vec<String> = content
+        .lines()
+        .filter(|line| !line.trim().is_empty())
+        .map(|line| line.to_string())
+        .collect();
+
+    lines.retain(|line| {
+        if let Some((existing_name, _)) = line.split_once('|') {
+            existing_name != name
+        } else {
+            true
+        }
+    });
+
+    lines.push(format!("{}|{}", name, command));
+
+    fs::write(CHECKS_FILE, lines.join("\n") + "\n").map_err(|e| e.to_string())?;
+
+    Ok(format!("saved check {}", name))
+}
+
+pub fn listchecks() -> Result<Vec<String>, String> {
+    let content = fs::read_to_string(CHECKS_FILE).unwrap_or_default();
+
+    let mut result = Vec::new();
+    for line in content.lines() {
+        if let Some((name, command)) = line.split_once('|') {
+            result.push(format!("{} -> {}", name, command));
+        }
+    }
+
+    Ok(result)
+}
+
+pub fn delcheck(args: &Vec<String>) -> Result<String, String> {
+    if args.is_empty() {
+        return Err("usage: delcheck <name>".to_string());
+    }
+
+    let name = args[0].clone();
+    let content = fs::read_to_string(CHECKS_FILE).unwrap_or_default();
+    let mut found = false;
+
+    let lines: Vec<String> = content
+        .lines()
+        .filter(|line| {
+            if let Some((existing_name, _)) = line.split_once('|') {
+                if existing_name == name {
+                    found = true;
+                    return false;
+                }
+            }
+            true
+        })
+        .map(|line| line.to_string())
+        .collect();
+
+    if !found {
+        return Err(format!("check {} not found", name));
+    }
+
+    fs::write(CHECKS_FILE, lines.join("\n") + "\n").map_err(|e| e.to_string())?;
+    Ok(format!("deleted check {}", name))
+}
+
+pub fn runcheck(args: &Vec<String>) -> Result<(String, String), String> {
+    if args.is_empty() {
+        return Err("usage: runcheck <name>".to_string());
+    }
+
+    let name = args[0].clone();
+    let content = fs::read_to_string(CHECKS_FILE).unwrap_or_default();
+
+    let mut command_to_run = String::new();
+    for line in content.lines() {
+        if let Some((existing_name, command)) = line.split_once('|') {
+            if existing_name == name {
+                command_to_run = command.to_string();
+                break;
+            }
+        }
+    }
+
+    if command_to_run.is_empty() {
+        return Err(format!("check {} not found", name));
+    }
+
+    let output = Command::new("sh")
+        .arg("-c")
+        .arg(command_to_run)
+        .output()
+        .map_err(|err| err.to_string())?;
+
+    let stdout = String::from_utf8(output.stdout).unwrap().trim().to_string();
+    let stderr = String::from_utf8(output.stderr).unwrap().trim().to_string();
+
+    Ok((stdout, stderr))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -128,7 +241,7 @@ mod tests {
         let args = vec![command];
 
         assert_eq!(
-            String::from("echo is a shell builtin"),
+            String::from("echo is a reqsh builtin"),
             command_type(&args).unwrap()
         );
     }

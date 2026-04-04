@@ -1,5 +1,5 @@
 [package]
-name = "shell"
+name = "reqsh"
 version = "0.1.0"
 authors = ["Harshil"]
 edition = "2024"

@@ -5,11 +5,13 @@ use std::fs::OpenOptions;
 use std::io::{self, Write};
 use std::process;
 
+use reqsh::{
+    cd, command_type, delcheck, echo, exec, history, jobs, listchecks, pwd, runcheck, savecheck,
+};
 use rustyline::config::BellStyle;
 use rustyline::error::ReadlineError;
 use rustyline::history::FileHistory;
 use rustyline::{CompletionType, Config, EditMode, Editor};
-use shell::{cd, command_type, echo, exec, history, jobs, pwd};
 
 use crate::helper::ShellHelper;
 use crate::parser::ShellCommand;
@@ -66,6 +68,41 @@ fn run(cmd: ShellCommand, rl: &mut Editor<ShellHelper, FileHistory>) {
         }
 
         "jobs" => jobs(),
+
+        "savecheck" => match savecheck(args) {
+            Ok(msg) => writeln!(stdout, "{}", msg).unwrap(),
+            Err(e) => writeln!(stderr, "{}", e).unwrap(),
+        },
+
+        "listchecks" => match listchecks() {
+            Ok(items) => {
+                if items.is_empty() {
+                    writeln!(stdout, "no checks saved").unwrap();
+                } else {
+                    for item in items {
+                        writeln!(stdout, "{}", item).unwrap();
+                    }
+                }
+            }
+            Err(e) => writeln!(stderr, "{}", e).unwrap(),
+        },
+
+        "delcheck" => match delcheck(args) {
+            Ok(msg) => writeln!(stdout, "{}", msg).unwrap(),
+            Err(e) => writeln!(stderr, "{}", e).unwrap(),
+        },
+
+        "runcheck" => match runcheck(args) {
+            Ok((out, err)) => {
+                if !out.is_empty() {
+                    writeln!(stdout, "{}", out).unwrap();
+                }
+                if !err.is_empty() {
+                    writeln!(stderr, "{}", err).unwrap();
+                }
+            }
+            Err(e) => writeln!(stderr, "{}", e).unwrap(),
+        },
 
         _ => match &exec(&command, &args) {
             Ok((out, err)) => {
